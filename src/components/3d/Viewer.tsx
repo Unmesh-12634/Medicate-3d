@@ -1,6 +1,6 @@
 ﻿import { useEffect, useRef, useState } from 'react';
 import { motion } from 'motion/react';
-import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader';
 
 interface ViewerProps {
   mode?: 'normal' | 'dissection' | 'pathology';
@@ -73,14 +73,23 @@ export function Viewer({ mode = 'normal', selectedOrgan }: ViewerProps) {
       scene.add(pointLight);
 
       const loader = new GLTFLoader();
-      const modelPath = '/models/heart.glb';
-      
+
+  // Determine model path and scale based on selected organ
+  // Default to heart model (kept as-is) at correct scale
+  let modelPath = '/heart.glb';
+  let modelScale = { x: 1000, y: 1000, z: 1000 };
+
+if (selectedOrgan === 'brain') {
+        modelPath = '/brain.glb';
+        modelScale = { x: 0.1, y: 0.1, z: 0.1 };
+      }
+
       loader.load(
         modelPath,
         (gltf: any) => {
           if (!mounted) return;
           const model = gltf.scene;
-          model.scale.set(1000, 1000, 1000);
+          model.scale.set(modelScale.x, modelScale.y, modelScale.z);
           model.position.set(0, 0, 0);
           scene.add(model);
           meshRef.current = model;
@@ -177,7 +186,7 @@ export function Viewer({ mode = 'normal', selectedOrgan }: ViewerProps) {
         <div className="absolute inset-0 flex items-center justify-center bg-background z-10">
           <div className="flex flex-col items-center gap-4">
             <div className="w-12 h-12 border-4 border-[#00A896] border-t-transparent rounded-full animate-spin" />
-            <p className="text-muted-foreground">Loading 3D Heart Model...</p>
+            <p className="text-muted-foreground">Loading 3D {selectedOrgan === 'brain' ? 'Brain' : 'Heart'} Model...</p>
           </div>
         </div>
       )}
@@ -199,9 +208,9 @@ export function Viewer({ mode = 'normal', selectedOrgan }: ViewerProps) {
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 1 }}
       >
-        <p className="font-semibold text-foreground mb-1"> Interactive 3D Heart Model</p>
-        <p> Click & Drag - Rotate model</p>
-        <p> Auto-rotating when idle</p>
+        <p className="font-semibold text-foreground mb-1">{selectedOrgan === 'brain' ? '🧠' : '🫀'} Interactive 3D {selectedOrgan === 'brain' ? 'Brain' : 'Heart'} Model</p>
+        <p>🖱️ Click & Drag - Rotate model</p>
+        <p>⚡ Auto-rotating when idle</p>
       </motion.div>
     </div>
   );

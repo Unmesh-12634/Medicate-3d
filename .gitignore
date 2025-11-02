@@ -36,3 +36,7 @@ pnpm-debug.log*
 
 # Vercel
 .vercel
+
+# Local asset dumps (avoid pushing huge raw model folders)
+3d models/
+brain/
