@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Search, ChevronLeft, ChevronRight, Layers, Eye, Activity, Play } from 'lucide-react';
-import { Viewer } from '../3d/Viewer';
+import { Search, ChevronLeft, ChevronRight, Layers, Eye, Activity, Play, Hand } from 'lucide-react';
+import { Viewer, type GestureControls } from '../3d/Viewer';
+import { HandGestureController } from '../3d/HandGestureController';
 import { PrimaryButton } from '../ui/PrimaryButton';
 import { QuizCard } from '../ui/QuizCard';
 
@@ -12,6 +13,8 @@ export function SimulatorPage() {
   const [infoPanelOpen, setInfoPanelOpen] = useState(false);
   const [quizMode, setQuizMode] = useState(false);
   const [selectedAnswer, setSelectedAnswer] = useState<number>();
+  const [gestureEnabled, setGestureEnabled] = useState(false);
+  const [gestureControls, setGestureControls] = useState<GestureControls | null>(null);
 
   const organs = [
     { id: 'heart', name: 'Heart', category: 'Cardiovascular' },
@@ -160,6 +163,17 @@ export function SimulatorPage() {
             <h3>3D Simulation: {organInfo[selectedOrgan]?.name || 'Organ'}</h3>
           </div>
           <div className="flex items-center gap-2">
+            <button
+              onClick={() => setGestureEnabled(!gestureEnabled)}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all ${
+                gestureEnabled
+                  ? 'bg-[#00A896] text-white'
+                  : 'bg-muted hover:bg-muted/80'
+              }`}
+            >
+              <Hand size={16} />
+              {gestureEnabled ? 'Gesture: ON' : 'Gesture: OFF'}
+            </button>
             <PrimaryButton onClick={() => setQuizMode(!quizMode)} icon={Play} className="text-sm px-4 py-2">
               {quizMode ? 'Exit Quiz' : 'Start Quiz'}
             </PrimaryButton>
@@ -168,14 +182,32 @@ export function SimulatorPage() {
 
         {/* 3D Viewer */}
         <div className="flex-1 relative p-6">
-          <Viewer key={selectedOrgan} mode={mode} selectedOrgan={selectedOrgan} />
+          <Viewer 
+            key={selectedOrgan} 
+            mode={gestureControls?.mode || mode} 
+            selectedOrgan={selectedOrgan}
+            gestureControls={gestureControls}
+            gestureEnabled={gestureEnabled}
+          />
+          
+          {/* Hand Gesture Controller */}
+          <HandGestureController
+            enabled={gestureEnabled}
+            onGestureChange={(controls) => {
+              setGestureControls(controls);
+              // Sync mode from gesture
+              if (controls.mode !== mode) {
+                setMode(controls.mode);
+              }
+            }}
+          />
 
           {/* Floating Controls */}
           {mode === 'dissection' && (
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              className="absolute left-10 bottom-10 bg-card/90 backdrop-blur-sm border border-border rounded-2xl p-4 space-y-3"
+              className="absolute left-10 bottom-10 bg-card/90 backdrop-blur-sm border border-border rounded-2xl p-4 space-y-3 z-30"
             >
               <h4 className="text-sm">Dissection Tools</h4>
               <div className="flex gap-2">
@@ -199,7 +231,7 @@ export function SimulatorPage() {
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              className="absolute left-10 bottom-10 bg-card/90 backdrop-blur-sm border border-border rounded-2xl p-4"
+              className="absolute left-10 bottom-10 bg-card/90 backdrop-blur-sm border border-border rounded-2xl p-4 z-30"
             >
               <h4 className="text-sm mb-3">Condition View</h4>
               <div className="flex gap-2">
@@ -242,14 +274,7 @@ export function SimulatorPage() {
           )}
         </AnimatePresence>
 
-        {!infoPanelOpen && (
-          <button
-            onClick={() => setInfoPanelOpen(true)}
-            className="absolute bottom-6 right-6 px-4 py-2 bg-[#00A896] text-white rounded-xl hover:bg-[#008f7f] transition-all"
-          >
-            Show Info
-          </button>
-        )}
+
       </div>
 
       {/* Quiz Overlay */}
@@ -259,7 +284,7 @@ export function SimulatorPage() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 top-16 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+            className="fixed inset-0 top-16 bg-black/50 backdrop-blur-sm flex items-center justify-center z-60 p-4"
           >
             <motion.div
               initial={{ scale: 0.9, opacity: 0 }}

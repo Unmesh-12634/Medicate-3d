@@ -1,13 +1,22 @@
 ﻿import { useEffect, useRef, useState } from 'react';
 import { motion } from 'motion/react';
-import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+
+export interface GestureControls {
+  rotationX: number;
+  rotationY: number;
+  zoom: number;
+  mode: 'normal' | 'dissection' | 'pathology';
+}
 
 interface ViewerProps {
   mode?: 'normal' | 'dissection' | 'pathology';
   selectedOrgan?: string;
+  gestureControls?: GestureControls | null;
+  gestureEnabled?: boolean;
 }
 
-export function Viewer({ mode = 'normal', selectedOrgan }: ViewerProps) {
+export function Viewer({ mode = 'normal', selectedOrgan, gestureControls: gestureControlsProp = null, gestureEnabled: gestureEnabledProp = false }: ViewerProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<any>(null);
   const cameraRef = useRef<any>(null);
@@ -15,6 +24,17 @@ export function Viewer({ mode = 'normal', selectedOrgan }: ViewerProps) {
   const meshRef = useRef<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const cleanupRef = useRef<(() => void) | null>(null);
+
+  const gestureControlsRef = useRef(gestureControlsProp);
+  const gestureEnabledRef = useRef(gestureEnabledProp);
+
+  useEffect(() => {
+    gestureControlsRef.current = gestureControlsProp;
+  }, [gestureControlsProp]);
+
+  useEffect(() => {
+    gestureEnabledRef.current = gestureEnabledProp;
+  }, [gestureEnabledProp]);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -104,16 +124,15 @@ if (selectedOrgan === 'brain') {
 
       let isDragging = false;
       let previousMousePosition = { x: 0, y: 0 };
-      let autoRotate = true;
 
       const onMouseDown = (e: MouseEvent) => {
+        if (gestureEnabledRef.current) return; // Disable mouse control when gestures are active
         isDragging = true;
-        autoRotate = false;
         previousMousePosition = { x: e.clientX, y: e.clientY };
       };
 
       const onMouseMove = (e: MouseEvent) => {
-        if (!isDragging || !meshRef.current) return;
+        if (gestureEnabledRef.current || !isDragging || !meshRef.current) return;
         const deltaX = e.clientX - previousMousePosition.x;
         const deltaY = e.clientY - previousMousePosition.y;
         meshRef.current.rotation.y += deltaX * 0.01;
@@ -132,9 +151,26 @@ if (selectedOrgan === 'brain') {
       let animationId: number;
       const animate = () => {
         animationId = requestAnimationFrame(animate);
-        if (meshRef.current && autoRotate) {
+        const autoRotate = !gestureEnabledRef.current && !isDragging;
+        
+        // Apply gesture controls if active
+        if (gestureEnabledRef.current && gestureControlsRef.current && meshRef.current) {
+          // Apply rotation directly from gesture (already in radians)
+          meshRef.current.rotation.x = gestureControlsRef.current.rotationX;
+          meshRef.current.rotation.y = gestureControlsRef.current.rotationY;
+          
+          // Apply zoom by scaling the model
+          const scale = gestureControlsRef.current.zoom;
+          if (selectedOrgan === 'brain') {
+            meshRef.current.scale.set(0.1 * scale, 0.1 * scale, 0.1 * scale);
+          } else {
+            meshRef.current.scale.set(1000 * scale, 1000 * scale, 1000 * scale);
+          }
+        } else if (meshRef.current && autoRotate) {
+          // Auto-rotate when not in gesture mode
           meshRef.current.rotation.y += 0.005;
         }
+        
         renderer.render(scene, camera);
       };
 
@@ -171,16 +207,14 @@ if (selectedOrgan === 'brain') {
       setIsLoading(false);
     });
 
-    return () => {
+      return () => {
       mounted = false;
       if (cleanupRef.current) {
         cleanupRef.current();
         cleanupRef.current = null;
       }
     };
-  }, [mode, selectedOrgan]);
-
-  return (
+  }, [mode, selectedOrgan]);  return (
     <div className="relative w-full h-full bg-black/5 dark:bg-black/20 rounded-2xl overflow-hidden">
       {isLoading && (
         <div className="absolute inset-0 flex items-center justify-center bg-background z-10">
@@ -209,8 +243,25 @@ if (selectedOrgan === 'brain') {
         transition={{ delay: 1 }}
       >
         <p className="font-semibold text-foreground mb-1">{selectedOrgan === 'brain' ? '🧠' : '🫀'} Interactive 3D {selectedOrgan === 'brain' ? 'Brain' : 'Heart'} Model</p>
-        <p>🖱️ Click & Drag - Rotate model</p>
-        <p>⚡ Auto-rotating when idle</p>
+        {gestureEnabledProp ? (
+          <>
+            <p className="flex items-center gap-2">
+              <span className="w-2 h-2 bg-[#00A896] rounded-full animate-pulse" />
+              Hand gesture control active
+            </p>
+            <p>✋ Move hand to rotate & zoom</p>
+            {gestureControlsProp && (
+              <p className="text-[#00A896] mt-1">
+                Rotation: {gestureControlsProp.rotationY.toFixed(1)}° | Zoom: {gestureControlsProp.zoom.toFixed(2)}x
+              </p>
+            )}
+          </>
+        ) : (
+          <>
+            <p>🖱️ Click & Drag - Rotate model</p>
+            <p>⚡ Auto-rotating when idle</p>
+          </>
+        )}
       </motion.div>
     </div>
   );
